@@ -1,8 +1,8 @@
 For VS 2022 go to [Smart Command Line Arguments VS2022](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments2022)
 
-For VS 2019 go to [Smart Command Line Arguments VS2019](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments)
+For VS 2019 the last supported version is [v3.3.0](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments)
 
-For VS 2017 go to [Smart Command Line Arguments VS2017](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments2017)
+For VS 2017 the last supported version is [v3.3.0](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments2017)
 
 For VS 2015 the last supported version is [v2.3.2](https://github.com/MBulli/SmartCommandlineArgs/releases/download/v2.3.2/SmartCmdArgs-v2.3.2.vsix)
 
@@ -10,7 +10,7 @@ A Visual Studio Extension which aims to provide a better UI to manage your comma
 
 ![Main Window](https://raw.githubusercontent.com/MBulli/SmartCommandlineArgs/master/Doc/Images/MainWindow.png "Command Line Arguments window, showning all projects")
 
-Visual Studio 2017, 2019 and 2022 and the following project types are supported:
+Visual Studio 2022 and the following project types are supported:
 
 - C# .Net Framework
 - C# .Net Core
