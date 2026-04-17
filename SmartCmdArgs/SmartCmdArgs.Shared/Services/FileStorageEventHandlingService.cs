@@ -1,9 +1,8 @@
-﻿using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Threading;
-using SmartCmdArgs.Helper;
+﻿using SmartCmdArgs.Helper;
 using SmartCmdArgs.Wrapper;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SmartCmdArgs.Services
 {
@@ -15,6 +14,11 @@ namespace SmartCmdArgs.Services
 
     internal class FileStorageEventHandlingService : IFileStorageEventHandlingService
     {
+        // Coalesces filewatcher bursts (e.g. UBT regenerating many .args.json files at once)
+        // into a single update pass. 250 ms is imperceptible to users saving edits but
+        // collapses UBT bursts that span seconds.
+        private static readonly TimeSpan DebounceWindow = TimeSpan.FromMilliseconds(250);
+
         private readonly IFileStorageService fileStorage;
         private readonly IOptionsSettingsService optionsSettings;
         private readonly ISettingsService settingsService;
@@ -22,6 +26,13 @@ namespace SmartCmdArgs.Services
         private readonly IVisualStudioHelperService vsHelper;
         private readonly IViewModelUpdateService viewModelUpdateService;
         private readonly IToolWindowHistory toolWindowHistory;
+
+        private readonly Debouncer _debouncer;
+
+        private readonly object _pendingLock = new object();
+        private readonly HashSet<IVsHierarchyWrapper> _pendingProjects = new HashSet<IVsHierarchyWrapper>();
+        private bool _pendingSolutionWide;
+        private bool _pendingSettings;
 
         public FileStorageEventHandlingService(
             IFileStorageService fileStorage,
@@ -39,11 +50,14 @@ namespace SmartCmdArgs.Services
             this.vsHelper = vsHelper;
             this.viewModelUpdateService = viewModelUpdateService;
             this.toolWindowHistory = toolWindowHistory;
+
+            _debouncer = new Debouncer(DebounceWindow, ProcessPendingChanges);
         }
 
         public void Dispose()
         {
             DetachFromEvents();
+            _debouncer.Dispose();
         }
 
         public void AttachToEvents()
@@ -53,63 +67,93 @@ namespace SmartCmdArgs.Services
 
         public void DetachFromEvents()
         {
-            fileStorage.FileStorageChanged += FileStorage_FileStorageChanged;
+            fileStorage.FileStorageChanged -= FileStorage_FileStorageChanged;
         }
 
         private void FileStorage_FileStorageChanged(object sender, FileStorageChangedEventArgs e)
         {
             // This event is triggered on non-main thread!
 
-            Logger.Info($"Dispatching update commands function call");
-
-            ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
+            lock (_pendingLock)
             {
-                // git branch and merge might lead to a race condition here.
-                // If a branch is checkout where the json file differs, the
-                // filewatcher will trigger an event which is dispatched here.
-                // However, while the function call is queued VS may reopen the
-                // solution due to changes. This will ultimately result in a
-                // null ref exception because the project object is unloaded.
-                // UpdateCommandsForProject() will skip such projects because
-                // their guid is empty.
-
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
                 if (e.Type == FileStorageChanedType.Settings)
                 {
-                    if (optionsSettings.SaveSettingsToJson)
-                        settingsService.Load();
-
-                    return;
+                    _pendingSettings = true;
                 }
-
-                if (!lifeCycleService.IsEnabled)
-                    return;
-
-                if (e.IsSolutionWide != optionsSettings.UseSolutionDir)
-                    return;
-
-                if (!optionsSettings.VcsSupportEnabled)
-                    return;
-
-                toolWindowHistory.SaveState();
-
-                IEnumerable<IVsHierarchyWrapper> projects;
-                if (e.IsSolutionWide)
+                else if (e.IsSolutionWide)
                 {
-                    Logger.Info($"Dispatched update commands function calls for the solution.");
+                    _pendingSolutionWide = true;
+                }
+                else if (e.Project != null)
+                {
+                    _pendingProjects.Add(e.Project);
+                }
+            }
+
+            _debouncer.CallActionDebounced();
+        }
+
+        private void ProcessPendingChanges()
+        {
+            // Runs on UI thread (Debouncer onUiThread default = true).
+
+            bool handleSettings;
+            bool handleSolutionWide;
+            List<IVsHierarchyWrapper> projectsToUpdate;
+
+            lock (_pendingLock)
+            {
+                handleSettings = _pendingSettings;
+                handleSolutionWide = _pendingSolutionWide;
+                projectsToUpdate = _pendingProjects.Count > 0
+                    ? _pendingProjects.ToList()
+                    : null;
+
+                _pendingSettings = false;
+                _pendingSolutionWide = false;
+                _pendingProjects.Clear();
+            }
+
+            if (handleSettings)
+            {
+                if (optionsSettings.SaveSettingsToJson)
+                    settingsService.Load();
+            }
+
+            if (!lifeCycleService.IsEnabled)
+                return;
+
+            if (!optionsSettings.VcsSupportEnabled)
+                return;
+
+            // git branch and merge might lead to a race condition here.
+            // If a branch is checkout where the json file differs, the
+            // filewatcher will trigger an event which is dispatched here.
+            // However, while the function call is queued VS may reopen the
+            // solution due to changes. This will ultimately result in a
+            // null ref exception because the project object is unloaded.
+            // UpdateCommandsForProject() will skip such projects because
+            // their guid is empty.
+
+            IEnumerable<IVsHierarchyWrapper> projects = null;
+            if (optionsSettings.UseSolutionDir)
+            {
+                if (handleSolutionWide)
                     projects = vsHelper.GetSupportedProjects();
-                }
-                else
-                {
-                    Logger.Info($"Dispatched update commands function call for project '{e.Project.GetDisplayName()}'");
-                    projects = new[] { e.Project };
-                }
+            }
+            else if (projectsToUpdate != null)
+            {
+                projects = projectsToUpdate;
+            }
 
-                viewModelUpdateService.UpdateCommandsForProjects(projects);
+            if (projects == null)
+                return;
 
-                viewModelUpdateService.UpdateIsActiveForParamsDebounced();
-            }).Task.Forget(); ;
+            toolWindowHistory.SaveState();
+
+            viewModelUpdateService.UpdateCommandsForProjects(projects);
+
+            viewModelUpdateService.UpdateIsActiveForParamsDebounced();
         }
     }
 }

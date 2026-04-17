@@ -219,11 +219,9 @@ namespace SmartCmdArgs.Services
 
         public void UpdateCommandsForProjects(IEnumerable<IVsHierarchyWrapper> projects, Action<IVsHierarchyWrapper> actionAfterUpdate)
         {
-            var supportedProjects = vsHelper.GetSupportedProjects();
+            List<IVsHierarchyWrapper> startupProjects = null;
 
-            List<IVsHierarchyWrapper> startupProjects = null; 
-
-            foreach (var project in supportedProjects)
+            foreach (var project in projects)
             {
                 if (project.GetGuid() == Guid.Empty)
                 {
