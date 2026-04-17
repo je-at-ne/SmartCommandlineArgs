@@ -369,40 +369,42 @@ namespace SmartCmdArgs.Services
             for (int index = 1; index <= configs.Count; index++)
             {
                 dynamic cfg = configs.Item(index); // is VCConfiguration
-                dynamic dbg = cfg.DebugSettings;  // is VCDebugSettings
 
                 var items = new List<CmdItemJson>();
 
+                // Visual Studio only honors properties belonging to the active DebuggerFlavor,
+                // so probing every known rule per config costs ~8x the COM round-trips for no
+                // benefit. Resolve the active flavor once and probe just that rule; fall back
+                // to the legacy DebugSettings path if the flavor isn't one we know about.
+                string activeDebuggerFlavour = cfg.Rules.Item("DebuggerGeneralProperties")?.GetUnevaluatedPropertyValue("DebuggerFlavor");
+                var activeVcPropInfo = VCPropInfo.FirstOrDefault(p => p.RuleName == activeDebuggerFlavour);
                 var foundActiveFlavour = false;
 
-                string activeDebuggerFlavour = cfg.Rules.Item("DebuggerGeneralProperties")?.GetUnevaluatedPropertyValue("DebuggerFlavor");
-                foreach (var vcPropInfo in VCPropInfo)
+                if (activeVcPropInfo.RuleName != null)
                 {
-                    dynamic rule = cfg.Rules.Item(vcPropInfo.RuleName); // is IVCRulePropertyStorage
+                    dynamic rule = cfg.Rules.Item(activeVcPropInfo.RuleName); // is IVCRulePropertyStorage
                     if (rule != null)
                     {
-                        var isActiveRule = activeDebuggerFlavour == vcPropInfo.RuleName;
-                        foundActiveFlavour |= isActiveRule;
-
+                        foundActiveFlavour = true;
                         var flavourItems = new List<CmdItemJson>();
 
                         if (includeArgs)
                         {
-                            var args = rule.GetUnevaluatedPropertyValue(vcPropInfo.ArgsPropName);
+                            var args = rule.GetUnevaluatedPropertyValue(activeVcPropInfo.ArgsPropName);
                             if (!string.IsNullOrEmpty(args))
                             {
                                 flavourItems.Add(new CmdItemJson
                                 {
                                     Type = ViewModel.CmdParamType.CmdArg,
                                     Command = args,
-                                    Enabled = isActiveRule,
+                                    Enabled = true,
                                 });
                             }
                         }
 
-                        if (includeEnvVars && vcPropInfo.EnvPropName != null)
+                        if (includeEnvVars && activeVcPropInfo.EnvPropName != null)
                         {
-                            var envVars = rule.GetUnevaluatedPropertyValue(vcPropInfo.EnvPropName);
+                            var envVars = rule.GetUnevaluatedPropertyValue(activeVcPropInfo.EnvPropName);
                             if (!string.IsNullOrEmpty(envVars))
                             {
                                 foreach (var envVarPair in GetEnvVarDictFromString(envVars))
@@ -411,50 +413,51 @@ namespace SmartCmdArgs.Services
                                     {
                                         Type = ViewModel.CmdParamType.EnvVar,
                                         Command = $"{envVarPair.Key}={envVarPair.Value}",
-                                        Enabled = isActiveRule,
+                                        Enabled = true,
                                     });
                                 }
                             }
                         }
 
-                        if (includeWorkDir && vcPropInfo.WorkDirPropName != null)
+                        if (includeWorkDir && activeVcPropInfo.WorkDirPropName != null)
                         {
-                            var workDir = rule.GetUnevaluatedPropertyValue(vcPropInfo.WorkDirPropName);
+                            var workDir = rule.GetUnevaluatedPropertyValue(activeVcPropInfo.WorkDirPropName);
                             if (!string.IsNullOrEmpty(workDir))
                             {
                                 flavourItems.Add(new CmdItemJson
                                 {
                                     Type = ViewModel.CmdParamType.WorkDir,
                                     Command = workDir,
-                                    Enabled = isActiveRule,
+                                    Enabled = true,
                                 });
                             }
                         }
 
-                        if (includeLaunchApp && vcPropInfo.LaunchAppPropName != null)
+                        if (includeLaunchApp && activeVcPropInfo.LaunchAppPropName != null)
                         {
-                            var launchApp = rule.GetUnevaluatedPropertyValue(vcPropInfo.LaunchAppPropName);
+                            var launchApp = rule.GetUnevaluatedPropertyValue(activeVcPropInfo.LaunchAppPropName);
                             if (!string.IsNullOrEmpty(launchApp))
                             {
                                 flavourItems.Add(new CmdItemJson
                                 {
                                     Type = ViewModel.CmdParamType.LaunchApp,
                                     Command = launchApp,
-                                    Enabled = isActiveRule,
+                                    Enabled = true,
                                 });
                             }
                         }
 
                         if (flavourItems.Count > 0)
                         {
-                            items.Add(new CmdItemJson { Command = vcPropInfo.RuleName, Items = flavourItems });
+                            items.Add(new CmdItemJson { Command = activeVcPropInfo.RuleName, Items = flavourItems });
                         }
                     }
-                    else Logger.Info($"GetVCProjEngineAllArguments: ProjectConfig Rule '{vcPropInfo.RuleName}' returned null");
                 }
 
                 if (!foundActiveFlavour)
                 {
+                    dynamic dbg = cfg.DebugSettings; // is VCDebugSettings
+
                     if (includeLaunchApp && !string.IsNullOrEmpty(dbg?.Command))
                     {
                         items.Insert(0, new CmdItemJson { Type = ViewModel.CmdParamType.LaunchApp, Command = dbg?.Command, Enabled = true });
