@@ -126,6 +126,8 @@ namespace SmartCmdArgs.Services
 
             public ProjectState(IVsHierarchyWrapper pHierarchy, Action launchProfileChangeAction)
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
+
                 ProjectDir = pHierarchy.GetProjectDir();
                 ProjectName = pHierarchy.GetName();
                 IsLoaded = pHierarchy.IsLoaded();
@@ -236,6 +238,7 @@ namespace SmartCmdArgs.Services
 
         public void SetAsStartupProject(Guid guid)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             SetNewStartupProject(GetUniqueName(HierarchyForProjectGuid(guid)));
         }
 
@@ -532,6 +535,8 @@ namespace SmartCmdArgs.Services
 
         int IVsSolutionEvents.OnAfterOpenProject(IVsHierarchy pHierarchy, int fAdded)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             var hierarchyWrapper = pHierarchy.Wrap();
             if (!_projectConfigService.Value.IsSupportedProject(hierarchyWrapper))
                 return LogIgnoringUnsupportedProjectType();

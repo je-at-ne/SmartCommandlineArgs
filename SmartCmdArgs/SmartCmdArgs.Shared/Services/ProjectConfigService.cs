@@ -142,6 +142,8 @@ namespace SmartCmdArgs.Services
         {
             return (EnvDTE.Project project, List<CmdItemJson> allArgs, bool includeArgs, bool includeEnvVars, bool includeWorkDir, bool includeLaunchApp) =>
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
+
                 if (includeArgs && argsPropName != null && TryGetSingleConfigProperty(project, argsPropName, out string args))
                 {
                     allArgs.Add(new CmdItemJson
@@ -627,6 +629,8 @@ namespace SmartCmdArgs.Services
 
         private static void SetCpsProjectConfig(EnvDTE.Project project, string arguments, IDictionary<string, string> envVars, string workDir, string launchApp)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             // Should only be called in VS 2017 or higher
             // .Net Core 2 is not supported by VS 2015, so this should not cause problems
             CpsProjectSupport.SetCpsProjectConfig(project, arguments, envVars, workDir, launchApp);
@@ -634,6 +638,8 @@ namespace SmartCmdArgs.Services
 
         private static void GetItemsFromCpsProjectConfig(EnvDTE.Project project, List<CmdItemJson> allArgs, bool includeArgs, bool includeEnvVars, bool includeWorkDir, bool includeLaunchApp)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             // Should only be called in VS 2017 or higher
             // see SetCpsProjectArguments
             allArgs.AddRange(CpsProjectSupport.GetCpsProjectAllArguments(project, includeArgs, includeEnvVars, includeWorkDir, includeLaunchApp));

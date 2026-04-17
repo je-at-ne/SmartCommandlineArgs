@@ -1,4 +1,5 @@
-﻿using SmartCmdArgs.Helper;
+﻿using Microsoft.VisualStudio.Shell;
+using SmartCmdArgs.Helper;
 using SmartCmdArgs.ViewModel;
 using SmartCmdArgs.Wrapper;
 using System;
@@ -36,6 +37,8 @@ namespace SmartCmdArgs.Services
 
         private TResult AggregateComamndLineItemsForProject<TResult>(IVsHierarchyWrapper project, Func<IEnumerable<CmdBase>, Func<CmdContainer, TResult>, CmdContainer, TResult> joinItems)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (project == null)
                 return default;
 

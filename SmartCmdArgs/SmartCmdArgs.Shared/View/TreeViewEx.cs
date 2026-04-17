@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using Microsoft.VisualStudio.Shell;
 using SmartCmdArgs.Helper;
 using SmartCmdArgs.View.Converter;
 using SmartCmdArgs.ViewModel;
@@ -327,6 +328,8 @@ namespace SmartCmdArgs.View
 
         private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             _projConfigMenuItem.Items.Clear();
             _projPlatformMenuItem.Items.Clear();
             _launchProfileMenuItem.Items.Clear();

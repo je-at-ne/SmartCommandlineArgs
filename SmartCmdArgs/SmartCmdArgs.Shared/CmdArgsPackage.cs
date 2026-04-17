@@ -258,6 +258,8 @@ namespace SmartCmdArgs
 
         public List<string> GetLaunchProfiles(Guid projGuid)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             var project = vsHelper.HierarchyForProjectGuid(projGuid);
 
             List<string> launchProfiles = null;

@@ -93,6 +93,7 @@ namespace SmartCmdArgs.Wrapper
 
         public Guid GetGuid()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             return GetGuidProperty((int)__VSHPROPID.VSHPROPID_ProjectIDGuid);
         }
 
@@ -123,6 +124,7 @@ namespace SmartCmdArgs.Wrapper
 
         public Guid GetKind()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
             return GetGuidProperty((int)__VSHPROPID.VSHPROPID_TypeGuid);
         }
 

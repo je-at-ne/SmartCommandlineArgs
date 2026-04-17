@@ -60,6 +60,8 @@ namespace SmartCmdArgs.Helper
 
         public static string GetActiveLaunchProfileName(EnvDTE.Project project)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (TryGetProjectServices(project, out IUnconfiguredProjectServices unconfiguredProjectServices, out IProjectServices projectServices))
             {
                 var launchSettingsProvider = unconfiguredProjectServices.ExportProvider.GetExportedValue<ILaunchSettingsProvider>();
@@ -70,6 +72,8 @@ namespace SmartCmdArgs.Helper
 
         public static IEnumerable<string> GetLaunchProfileNames(EnvDTE.Project project)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (TryGetProjectServices(project, out IUnconfiguredProjectServices unconfiguredProjectServices, out IProjectServices projectServices))
             {
                 var launchSettingsProvider = unconfiguredProjectServices.ExportProvider.GetExportedValue<ILaunchSettingsProvider>();
@@ -80,6 +84,8 @@ namespace SmartCmdArgs.Helper
 
         public static IDisposable ListenToLaunchProfileChanges(EnvDTE.Project project, Action listener)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (TryGetProjectServices(project, out IUnconfiguredProjectServices unconfiguredProjectServices, out IProjectServices projectServices))
             {
                 var launchSettingsProvider = unconfiguredProjectServices.ExportProvider.GetExportedValue<ILaunchSettingsProvider>();
@@ -97,6 +103,8 @@ namespace SmartCmdArgs.Helper
 
         public static void SetCpsProjectConfig(EnvDTE.Project project, string arguments, IDictionary<string, string> envVars, string workDir, string launchApp)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             IUnconfiguredProjectServices unconfiguredProjectServices;
             IProjectServices projectServices;
 
@@ -134,6 +142,8 @@ namespace SmartCmdArgs.Helper
 
         public static List<CmdItemJson> GetCpsProjectAllArguments(EnvDTE.Project project, bool includeArgs, bool includeEnvVars, bool includeWorkDir, bool includeLaunchApp)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             IUnconfiguredProjectServices unconfiguredProjectServices;
             IProjectServices projectServices;
 
