@@ -1,9 +1,11 @@
 using Microsoft.VisualStudio.Shell;
+using Newtonsoft.Json;
 using SmartCmdArgs.Helper;
 using SmartCmdArgs.DataSerialization;
 using SmartCmdArgs.Wrapper;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace SmartCmdArgs.Services
@@ -281,7 +283,20 @@ namespace SmartCmdArgs.Services
 
         #region VCProjEngine (C/C++)
 
-        private static readonly List<(string RuleName, string ArgsPropName, string EnvPropName, string WorkDirPropName, string LaunchAppPropName)> VCPropInfo = new List<(string RuleName, string PropName, string EnvPropName, string WorkDirPropName, string LaunchAppPropName)>
+        private class ExtraDebuggerFlavor
+        {
+            public string RuleName { get; set; }
+            public string ArgsPropName { get; set; }
+            public string EnvPropName { get; set; }
+            public string WorkDirPropName { get; set; }
+            public string LaunchAppPropName { get; set; }
+        }
+
+        private static readonly List<(string RuleName, string ArgsPropName, string EnvPropName, string WorkDirPropName, string LaunchAppPropName)> VCPropInfo = BuildVCPropInfo();
+
+        private static List<(string RuleName, string ArgsPropName, string EnvPropName, string WorkDirPropName, string LaunchAppPropName)> BuildVCPropInfo()
+        {
+            var list = new List<(string RuleName, string ArgsPropName, string EnvPropName, string WorkDirPropName, string LaunchAppPropName)>
             {
                 ("WindowsLocalDebugger", "LocalDebuggerCommandArguments", "LocalDebuggerEnvironment", "LocalDebuggerWorkingDirectory", "LocalDebuggerCommand"),
                 ("WindowsRemoteDebugger", "RemoteDebuggerCommandArguments", "RemoteDebuggerEnvironment", "RemoteDebuggerWorkingDirectory", "RemoteDebuggerCommand"),
@@ -292,6 +307,44 @@ namespace SmartCmdArgs.Services
                 ("LinuxDebugger", "RemoteDebuggerCommandArguments", null, "RemoteDebuggerWorkingDirectory", null),
                 ("AppHostLocalDebugger", "CommandLineArgs", null, null, null),
             };
+
+            try
+            {
+                var path = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "SmartCommandlineArgs",
+                    "debugger-flavors.json");
+
+                if (!File.Exists(path))
+                {
+                    Logger.Info($"No extra debugger flavors file at '{path}'");
+                    return list;
+                }
+
+                var extras = JsonConvert.DeserializeObject<List<ExtraDebuggerFlavor>>(File.ReadAllText(path));
+                if (extras == null)
+                {
+                    Logger.Warn($"Extra debugger flavors file '{path}' deserialized to null");
+                    return list;
+                }
+
+                int added = 0;
+                foreach (var e in extras)
+                {
+                    if (string.IsNullOrEmpty(e?.RuleName) || string.IsNullOrEmpty(e.ArgsPropName))
+                        continue;
+                    list.Add((e.RuleName, e.ArgsPropName, e.EnvPropName, e.WorkDirPropName, e.LaunchAppPropName));
+                    added++;
+                }
+                Logger.Info($"Loaded {added} extra debugger flavor(s) from '{path}'");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to load extra debugger flavors: {ex}");
+            }
+
+            return list;
+        }
 
         private static void SetVCProjEngineConfig(EnvDTE.Project project, string arguments, IDictionary<string, string> envVars, string workDir, string launchApp)
         {
