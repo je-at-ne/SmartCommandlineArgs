@@ -205,3 +205,6 @@ FakesAssemblies/
 
 # ignore gatherd vsix files for release
 *.vsix
+
+# Claude Code local settings
+.claude/
