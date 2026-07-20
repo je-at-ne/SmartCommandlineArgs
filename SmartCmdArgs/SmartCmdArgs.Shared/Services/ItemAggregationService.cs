@@ -48,8 +48,7 @@ namespace SmartCmdArgs.Services
 
             var projectObj = project.GetProject();
 
-            string projConfig = projectObj?.ConfigurationManager?.ActiveConfiguration?.ConfigurationName;
-            string projPlatform = projectObj?.ConfigurationManager?.ActiveConfiguration?.PlatformName;
+            var (projConfig, projPlatform) = vsHelper.GetActiveConfigNameAndPlatform(project);
 
             string activeLaunchProfile = null;
             if (project.IsCpsProject())

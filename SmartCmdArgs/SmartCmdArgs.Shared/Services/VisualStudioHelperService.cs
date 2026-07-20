@@ -67,6 +67,7 @@ namespace SmartCmdArgs.Services
         IVsHierarchyWrapper HierarchyForProjectName(string projectName);
         IVsHierarchyWrapper HierarchyForProjectGuid(Guid propjectGuid);
         string GetUniqueName(IVsHierarchyWrapper hierarchy);
+        (string ConfigName, string PlatformName) GetActiveConfigNameAndPlatform(IVsHierarchyWrapper hierarchy);
         string GetMSBuildPropertyValueForActiveConfig(IVsHierarchyWrapper hierarchy, string propName);
         string GetMSBuildPropertyValue(IVsHierarchyWrapper hierarchy, string propName, string configName = null);
         bool CanEditFile(string fileName);
@@ -309,20 +310,46 @@ namespace SmartCmdArgs.Services
             return uniqueName;
         }
 
+        // DTE's ConfigurationManager.ActiveConfiguration is a chain of COM calls that gets
+        // queried many times per tool window change (per aggregation pass and per $(Macro)
+        // occurrence). The active config changes rarely, so cache it per project and drop
+        // the cache on active-config-change and project/solution lifetime events.
+        private readonly Dictionary<Guid, (string ConfigName, string PlatformName)> activeConfigCache = new Dictionary<Guid, (string ConfigName, string PlatformName)>();
+
+        public (string ConfigName, string PlatformName) GetActiveConfigNameAndPlatform(IVsHierarchyWrapper hierarchy)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var projectGuid = hierarchy.GetGuid();
+            if (projectGuid != Guid.Empty && activeConfigCache.TryGetValue(projectGuid, out var cached))
+                return cached;
+
+            string configName = null;
+            string platformName = null;
+            try
+            {
+                var activeConfig = hierarchy.GetProject()?.ConfigurationManager?.ActiveConfiguration;
+                configName = activeConfig?.ConfigurationName;
+                platformName = activeConfig?.PlatformName;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to get active configuration for project '{hierarchy.GetName()}' with error '{ex}'");
+            }
+
+            var result = (configName, platformName);
+
+            if (projectGuid != Guid.Empty && configName != null)
+                activeConfigCache[projectGuid] = result;
+
+            return result;
+        }
+
         public string GetMSBuildPropertyValueForActiveConfig(IVsHierarchyWrapper hierarchy, string propName)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            string configName = null;
-            try
-            {
-                configName = hierarchy.GetProject()?.ConfigurationManager.ActiveConfiguration.ConfigurationName;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to get active configuration name for project '{hierarchy.GetName()}' with error '{ex}'");
-                return null;
-            }
+            string configName = GetActiveConfigNameAndPlatform(hierarchy).ConfigName;
 
             if (configName == null)
                 return null;
@@ -492,6 +519,8 @@ namespace SmartCmdArgs.Services
             // This method is called for each Hierarchy element (e.g. project and folders), thus we filter for the startup project
             // to only trigger the config changed event once.
 
+            activeConfigCache.Clear();
+
             ProjectConfigurationChanged?.Invoke(this, pIVsHierarchy.Wrap());
 
             return S_OK;
@@ -529,6 +558,7 @@ namespace SmartCmdArgs.Services
         {
             ProjectStateMap.ForEach(x => x.Value.Dispose());
             ProjectStateMap.Clear();
+            activeConfigCache.Clear();
             SolutionAfterClose?.Invoke(this, EventArgs.Empty);
             return S_OK;
         }
@@ -558,6 +588,7 @@ namespace SmartCmdArgs.Services
                 return LogIgnoringUnsupportedProjectType();
 
             Guid projectGuid = hierarchyWrapper.GetGuid();
+            activeConfigCache.Remove(projectGuid);
 
             var isUloadProcess = ProjectStateMap.TryGetValue(projectGuid, out var state) && !state.IsLoaded;
 
@@ -592,6 +623,7 @@ namespace SmartCmdArgs.Services
                 return LogIgnoringUnsupportedProjectType();
 
             ProjectStateMap[realHierarchyWrapper.GetGuid()].IsLoaded = false;
+            activeConfigCache.Remove(realHierarchyWrapper.GetGuid());
 
             ProjectBeforeUnload?.Invoke(this, realHierarchyWrapper);
 
