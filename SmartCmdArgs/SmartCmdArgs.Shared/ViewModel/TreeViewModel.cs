@@ -168,8 +168,42 @@ namespace SmartCmdArgs.ViewModel
             UpdateTree();
         }
 
+        private int _updateTreeDeferCount;
+        private bool _updateTreePending;
+
+        private class UpdateTreeDeferral : IDisposable
+        {
+            private readonly TreeViewModel treeViewModel;
+            public UpdateTreeDeferral(TreeViewModel treeViewModel)
+            {
+                this.treeViewModel = treeViewModel;
+                treeViewModel._updateTreeDeferCount++;
+            }
+            public void Dispose()
+            {
+                if (--treeViewModel._updateTreeDeferCount == 0 && treeViewModel._updateTreePending)
+                {
+                    treeViewModel._updateTreePending = false;
+                    treeViewModel.UpdateTree();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Defers UpdateTree calls made inside the scope and runs a single one at the end
+        /// of the scope (if any call happened). UpdateTree walks every item of every
+        /// project, so populating many projects in a row must not run it once per project.
+        /// </summary>
+        public IDisposable DeferUpdateTree() => new UpdateTreeDeferral(this);
+
         public void UpdateTree()
         {
+            if (_updateTreeDeferCount > 0)
+            {
+                _updateTreePending = true;
+                return;
+            }
+
             // reset focus
             foreach (var item in AllProjects.SelectMany(x => x.GetEnumerable(useView: false, includeSelf: true)))
             {

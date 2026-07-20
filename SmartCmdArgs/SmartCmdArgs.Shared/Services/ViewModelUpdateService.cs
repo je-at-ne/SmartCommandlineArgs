@@ -228,27 +228,33 @@ namespace SmartCmdArgs.Services
         {
             List<IVsHierarchyWrapper> startupProjects = null;
 
-            foreach (var project in projects)
+            // Every populated project replaces its entry in treeViewModel.Projects, which
+            // triggers an UpdateTree walk over all items of all projects. Defer that to a
+            // single walk at the end of the batch.
+            using (treeViewModel.DeferUpdateTree())
             {
-                if (project.GetGuid() == Guid.Empty)
+                foreach (var project in projects)
                 {
-                    Logger.Info($"Race condition might occurred while dispatching update commands function call. Project is already unloaded.");
-                }
-
-                var gatherArgs = true;
-                if (optionsSettings.CppProjectScanHandling != CppProjectScanHandling.All && project.GetKind() == ProjectKinds.CPP)
-                {
-                    if (optionsSettings.CppProjectScanHandling == CppProjectScanHandling.OnlyStartup)
+                    if (project.GetGuid() == Guid.Empty)
                     {
-                        if (startupProjects == null)
-                            startupProjects = vsHelper.GetStartupProjects().ToList();
-
-                        gatherArgs = startupProjects.Contains(project);
+                        Logger.Info($"Race condition might occurred while dispatching update commands function call. Project is already unloaded.");
                     }
-                }
 
-                UpdateCommandsForProject(project, gatherArgs, false);
-                actionAfterUpdate?.Invoke(project);
+                    var gatherArgs = true;
+                    if (optionsSettings.CppProjectScanHandling != CppProjectScanHandling.All && project.GetKind() == ProjectKinds.CPP)
+                    {
+                        if (optionsSettings.CppProjectScanHandling == CppProjectScanHandling.OnlyStartup)
+                        {
+                            if (startupProjects == null)
+                                startupProjects = vsHelper.GetStartupProjects().ToList();
+
+                            gatherArgs = startupProjects.Contains(project);
+                        }
+                    }
+
+                    UpdateCommandsForProject(project, gatherArgs, false);
+                    actionAfterUpdate?.Invoke(project);
+                }
             }
         }
 
