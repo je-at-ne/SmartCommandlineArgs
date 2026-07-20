@@ -362,47 +362,54 @@ namespace SmartCmdArgs.Services
 
             var environmentString = envVars == null ? null : GetEnvVarStringFromDict(envVars);
 
-            // apply it first using the old way, in case the new way doesn't work for this type of projects (platforms other than Windows, for example)
-            // TODO: eliminate this way of setting stuff to avoid clutter in the *.user file
-            //       with this approach there are always entries for LocalDebuggerCommandArguments and LocalDebuggerEnvironment
-            //       which is the same as the rule WindowsLocalDebugger
-            dynamic vcDbg = vcCfg.DebugSettings;  // is VCDebugSettings
-            if (vcDbg != null)
+            // Visual Studio only honors properties belonging to the active DebuggerFlavor
+            // (same reasoning as in GetItemsFromVCProjEngineConfig), so write just that rule
+            // instead of every known one. Fall back to the legacy DebugSettings path if the
+            // flavor isn't one we know about (platforms other than Windows, for example).
+            string activeDebuggerFlavour = vcCfg.Rules.Item("DebuggerGeneralProperties")?.GetUnevaluatedPropertyValue("DebuggerFlavor");
+            var activeVcPropInfo = VCPropInfo.FirstOrDefault(p => p.RuleName == activeDebuggerFlavour);
+
+            var wroteActiveFlavour = false;
+            if (activeVcPropInfo.RuleName != null)
             {
-                if (arguments != null)
-                    vcDbg.CommandArguments = arguments;
-
-                if (environmentString != null)
-                    vcDbg.Environment = environmentString;
-
-                if (workDir != null)
-                    vcDbg.WorkingDirectory = workDir;
-
-                if (launchApp != null)
-                    vcDbg.Command = launchApp;
-            }
-            else
-                Logger.Info("SetVCProjEngineArguments: VCProject?.ActiveConfiguration?.DebugSettings returned null");
-
-            foreach (var vcPropInfo in VCPropInfo)
-            {
-                dynamic rule = vcCfg.Rules.Item(vcPropInfo.RuleName); // is IVCRulePropertyStorage
+                dynamic rule = vcCfg.Rules.Item(activeVcPropInfo.RuleName); // is IVCRulePropertyStorage
                 if (rule != null)
                 {
+                    wroteActiveFlavour = true;
+
                     if (arguments != null)
-                        rule.SetPropertyValue(vcPropInfo.ArgsPropName, arguments);
+                        rule.SetPropertyValue(activeVcPropInfo.ArgsPropName, arguments);
 
-                    if (vcPropInfo.EnvPropName != null && environmentString != null)
-                        rule.SetPropertyValue(vcPropInfo.EnvPropName, environmentString);
+                    if (activeVcPropInfo.EnvPropName != null && environmentString != null)
+                        rule.SetPropertyValue(activeVcPropInfo.EnvPropName, environmentString);
 
-                    if (vcPropInfo.WorkDirPropName != null && workDir != null)
-                        rule.SetPropertyValue(vcPropInfo.WorkDirPropName, workDir);
+                    if (activeVcPropInfo.WorkDirPropName != null && workDir != null)
+                        rule.SetPropertyValue(activeVcPropInfo.WorkDirPropName, workDir);
 
-                    if (vcPropInfo.LaunchAppPropName != null && launchApp != null)
-                        rule.SetPropertyValue(vcPropInfo.LaunchAppPropName, launchApp);
+                    if (activeVcPropInfo.LaunchAppPropName != null && launchApp != null)
+                        rule.SetPropertyValue(activeVcPropInfo.LaunchAppPropName, launchApp);
+                }
+            }
+
+            if (!wroteActiveFlavour)
+            {
+                dynamic vcDbg = vcCfg.DebugSettings;  // is VCDebugSettings
+                if (vcDbg != null)
+                {
+                    if (arguments != null)
+                        vcDbg.CommandArguments = arguments;
+
+                    if (environmentString != null)
+                        vcDbg.Environment = environmentString;
+
+                    if (workDir != null)
+                        vcDbg.WorkingDirectory = workDir;
+
+                    if (launchApp != null)
+                        vcDbg.Command = launchApp;
                 }
                 else
-                    Logger.Info($"SetVCProjEngineArguments: ProjectConfig Rule '{vcPropInfo.RuleName}' returned null");
+                    Logger.Info("SetVCProjEngineArguments: VCProject?.ActiveConfiguration?.DebugSettings returned null");
             }
         }
 
