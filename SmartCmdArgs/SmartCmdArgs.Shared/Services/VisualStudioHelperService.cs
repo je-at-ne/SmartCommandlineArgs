@@ -476,10 +476,12 @@ namespace SmartCmdArgs.Services
                 {
                     case VSConstants.VSStd97CmdID.Start:
                     case VSConstants.VSStd97CmdID.StepInto:
-                        // These command ids double as Continue (F5) and Step (F11) while a
-                        // debug session is active. The debuggee is already running with its
+                    case VSConstants.VSStd97CmdID.StepOver:
+                        // These command ids double as Continue (F5) and Step (F11/F10) while
+                        // a debug session is active. The debuggee is already running with its
                         // args, so pushing the config and saving json on every step/continue
-                        // is pointless work on the UI thread.
+                        // is pointless work on the UI thread. In design mode they all start
+                        // a debug session and need the args pushed first.
                         if (IsInDebugSession())
                             break;
                         ProjectBeforeRun?.Invoke(this, EventArgs.Empty);
