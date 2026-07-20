@@ -207,7 +207,14 @@ namespace SmartCmdArgs.Services
             }
 
             // push projectData to the ViewModel
-            toolWindowViewModel.PopulateFromProjectData(project, projectData);
+            // Suppress the throttled tree events while populating: the data just came from
+            // storage (json/suo/project config), so scheduling a json save and a project
+            // config push for every populated project only produces redundant file writes
+            // and COM round-trips (painful for filewatcher bursts in large solutions).
+            using (treeViewModel.SuppressThrottledTreeEvents())
+            {
+                toolWindowViewModel.PopulateFromProjectData(project, projectData);
+            }
 
             if (saveData)
             {

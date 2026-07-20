@@ -341,19 +341,42 @@ namespace SmartCmdArgs.ViewModel
             TreeChangedThrottled?.Invoke(this, new TreeChangedEventArgs(null, project));
         }
 
+        private int _throttledTreeEventsSuppressCount;
+
+        private class ThrottledTreeEventsSuppressor : IDisposable
+        {
+            private readonly TreeViewModel treeViewModel;
+            public ThrottledTreeEventsSuppressor(TreeViewModel treeViewModel)
+            {
+                this.treeViewModel = treeViewModel;
+                treeViewModel._throttledTreeEventsSuppressCount++;
+            }
+            public void Dispose() => treeViewModel._throttledTreeEventsSuppressCount--;
+        }
+
+        /// <summary>
+        /// Suppresses the throttled TreeContentChanged/TreeChanged events (which drive the
+        /// json save and the project config push) for tree events raised inside the scope.
+        /// Used while populating projects from stored data, so loading doesn't schedule a
+        /// write-back of what was just read. The unthrottled events still fire.
+        /// </summary>
+        public IDisposable SuppressThrottledTreeEvents() => new ThrottledTreeEventsSuppressor(this);
+
         public void OnTreeEvent(TreeEventBase treeEvent)
         {
             void FireTreeContentChanged(TreeEventBase e)
             {
                 TreeContentChanged?.Invoke(this, new TreeChangedEventArgs(e.Sender, e.AffectedProject));
-                _treeContentChangedDebouncerTable.CallActionDebouncedFor(e.AffectedProject);
+                if (_throttledTreeEventsSuppressCount == 0)
+                    _treeContentChangedDebouncerTable.CallActionDebouncedFor(e.AffectedProject);
                 FireTreeChanged(e);
             }
 
             void FireTreeChanged(TreeEventBase e)
             {
                 TreeChanged?.Invoke(this, new TreeChangedEventArgs(e.Sender, e.AffectedProject));
-                _treeChangedDebouncerTable.CallActionDebouncedFor(e.AffectedProject);
+                if (_throttledTreeEventsSuppressCount == 0)
+                    _treeChangedDebouncerTable.CallActionDebouncedFor(e.AffectedProject);
             }
 
             switch (treeEvent)
