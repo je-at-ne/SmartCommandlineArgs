@@ -468,14 +468,25 @@ namespace SmartCmdArgs.Services
 
         private void CommandEventsOnBeforeExecute(string guid, int id, object customIn, object customOut, ref bool cancelDefault)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (guid == _VSConstants_VSStd97CmdID_GUID)
             {
                 switch ((VSConstants.VSStd97CmdID)id)
                 {
                     case VSConstants.VSStd97CmdID.Start:
+                    case VSConstants.VSStd97CmdID.StepInto:
+                        // These command ids double as Continue (F5) and Step (F11) while a
+                        // debug session is active. The debuggee is already running with its
+                        // args, so pushing the config and saving json on every step/continue
+                        // is pointless work on the UI thread.
+                        if (IsInDebugSession())
+                            break;
+                        ProjectBeforeRun?.Invoke(this, EventArgs.Empty);
+                        break;
                     case VSConstants.VSStd97CmdID.StartNoDebug:
                     case VSConstants.VSStd97CmdID.Restart:
-                    case VSConstants.VSStd97CmdID.StepInto:
+                        // These launch a (new) process even during an active session.
                         ProjectBeforeRun?.Invoke(this, EventArgs.Empty);
                         break;
                 }
@@ -486,9 +497,26 @@ namespace SmartCmdArgs.Services
                 {
                     case VSConstants.VSStd2KCmdID.PROJSTARTDEBUG:
                     case VSConstants.VSStd2KCmdID.PROJSTEPINTO:
+                        // "Start/Step Into New Instance" launch a new process even during
+                        // an active session.
                         ProjectBeforeRun?.Invoke(this, EventArgs.Empty);
                         break;
                 }
+            }
+        }
+
+        private bool IsInDebugSession()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            try
+            {
+                return appObject?.Debugger?.CurrentMode != EnvDTE.dbgDebugMode.dbgDesignMode;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to query debugger mode: {ex}");
+                return false;
             }
         }
 
