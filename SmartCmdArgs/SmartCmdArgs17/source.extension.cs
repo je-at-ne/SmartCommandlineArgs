@@ -12,7 +12,7 @@ namespace SmartCmdArgs
         public const string Name = "Smart Command Line Arguments VS2022/2026";
         public const string Description = @"A Visual Studio 2022/2026 Extension which aims to provide a better UI to manage your command line arguments.";
         public const string Language = "en-US";
-        public const string Version = "4.0.0.9001";
+        public const string Version = "4.0.0.9002";
         public const string Author = "Irame & MBulli (je-at-ne fork)";
         public const string Tags = "Commandline Command Line Arguments cmd project";
         public const bool IsPreview = false;
