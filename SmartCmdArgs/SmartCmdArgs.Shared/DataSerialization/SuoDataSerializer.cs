@@ -87,6 +87,42 @@ namespace SmartCmdArgs.DataSerialization
             return result;
         }
 
+        /// <summary>
+        /// Serializes a single project into a partial SuoDataJson, used for undo/redo
+        /// snapshots taken on changes that only affect one project. Restoring iterates
+        /// only the contained ProjectArguments (per-item Enabled/Expanded/Selected are
+        /// captured by TransformCmdList), so the full-tree sets are not needed here.
+        /// Must not be written to the suo file.
+        /// </summary>
+        public static SuoDataJson Serialize(CmdProject project, TreeViewModel treeViewModel, SettingsViewModel settingsViewModel)
+        {
+            if (project == null)
+                throw new ArgumentNullException(nameof(project));
+            if (treeViewModel == null)
+                throw new ArgumentNullException(nameof(treeViewModel));
+
+            var data = new SuoDataJson();
+
+            data.Settings = new SettingsJson(settingsViewModel);
+            data.ShowAllProjects = treeViewModel.ShowAllProjects;
+
+            data.ProjectArguments.Add(project.Id, new ProjectDataJsonVersioned
+            {
+                Id = project.Id,
+                ExclusiveMode = project.ExclusiveMode,
+                Delimiter = project.Delimiter,
+                Postfix = project.Postfix,
+                Prefix = project.Prefix,
+                Items = TransformCmdList(project.Items),
+
+                // not in JSON
+                Expanded = project.IsExpanded,
+                Selected = project.IsSelected,
+            });
+
+            return data;
+        }
+
         public static SuoDataJson Serialize(TreeViewModel treeViewModel, SettingsViewModel settingsViewModel)
         {
             if (treeViewModel == null)

@@ -391,7 +391,7 @@ namespace SmartCmdArgs.ViewModel
                     FireTreeContentChanged(e);
                     break;
                 case CheckStateWillChangeEvent e:
-                    toolWindowHistory.Value.SaveState();
+                    toolWindowHistory.Value.SaveStateForProject(e.AffectedProject);
                     break;
                 case CheckStateChangedEvent e:
                     FireTreeChanged(e);

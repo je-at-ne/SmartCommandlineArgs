@@ -15,6 +15,7 @@ namespace SmartCmdArgs.Services
         void RestorePrevState();
         void Resume();
         void SaveState();
+        void SaveStateForProject(CmdProject project);
         void SaveStateAndPause();
     }
 
@@ -63,6 +64,25 @@ namespace SmartCmdArgs.Services
 
             if (_pauseCounter == 0)
                 _buffer.Push(SuoDataSerializer.Serialize(treeViewModel, settingsViewModel.Value));
+        }
+
+        public void SaveStateForProject(CmdProject project)
+        {
+            // Serializing the whole tree on every single change is costly in large
+            // solutions, so snapshot only the affected project. Restoring applies just
+            // the projects contained in a snapshot, so partial snapshots compose
+            // correctly with full ones in the ring buffer.
+            if (project == null)
+            {
+                SaveState();
+                return;
+            }
+
+            if (!lifeCycleService.Value.IsEnabled)
+                return;
+
+            if (_pauseCounter == 0)
+                _buffer.Push(SuoDataSerializer.Serialize(project, treeViewModel, settingsViewModel.Value));
         }
 
         public void SaveStateAndPause()
