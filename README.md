@@ -4,6 +4,41 @@ A Visual Studio Extension which aims to provide a better UI to manage your comma
 
 > "The only smart way to pass standard command arguments to programs." - [A happy user](https://marketplace.visualstudio.com/items?itemName=MBulli.SmartCommandlineArguments#review-details)
 
+## About this fork
+
+This is an unofficial personal fork of [MBulli/SmartCommandlineArgs](https://github.com/MBulli/SmartCommandlineArgs)
+(version `4.0.0.900x`, publisher suffix "je-at-ne fork"). It is not published to the Visual Studio Marketplace;
+build the VSIX from source. Differences from upstream:
+
+- Performance fixes for very large solutions (e.g. Unreal Engine): faster solution load,
+  fewer COM round-trips and file writes on every change, batched filewatcher reloads.
+- VS 2022 and VS 2026 only, x64 build.
+- Extra debugger flavors can be added via a user config file (see below).
+
+The changes in this fork were co-authored with [Claude](https://claude.com), Anthropic's AI assistant.
+
+### User-defined debugger flavors
+
+For C++ project systems the extension doesn't know about (e.g. vendor-specific or NDA'd
+debuggers), extra `DebuggerFlavor` rules can be added without modifying the source. Create
+`%LOCALAPPDATA%\SmartCommandlineArgs\debugger-flavors.json` containing a JSON array:
+
+```json
+[
+  {
+    "RuleName": "MyVendorDebugger",
+    "ArgsPropName": "RemoteDebuggerCommandArguments",
+    "EnvPropName": "RemoteDebuggerEnvironment",
+    "WorkDirPropName": "RemoteDebuggerWorkingDirectory",
+    "LaunchAppPropName": "RemoteDebuggerCommand"
+  }
+]
+```
+
+`RuleName` and `ArgsPropName` are required; the other properties may be `null` or omitted if
+the rule doesn't support them. A missing file is fine; malformed JSON logs a warning and the
+built-in flavor list is used. The file is read once per Visual Studio session.
+
 ## Install
 
 Install the extension inside Visual Studio or download it from the Visual Studio Marketplace:
